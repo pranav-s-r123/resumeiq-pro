@@ -58,13 +58,13 @@ function ensureArray(arr: any, fallback: string[]) {
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
-    const {
-       data: { session },
-         } = await supabase.auth.getSession();
+    const userId = formData.get("userId") as string;
 
-const user = session?.user;
+console.log("USER ID FROM FORM:", userId);
+
 
     const file = formData.get("resume") as File;
+    
     const jobDescription =
       (formData.get("jobDescription") as string) || "";
 
@@ -183,7 +183,7 @@ try {
   .from("resume_history")
   .insert([
     {
-      user_id: user?.id, 
+      user_id: userId || null, 
       file_name: file.name,
       ats_score: atsScore,
       job_match_score: jobMatchScore,

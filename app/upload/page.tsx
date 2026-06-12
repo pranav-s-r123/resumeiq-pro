@@ -1,4 +1,5 @@
 "use client";
+import { supabase } from "@/lib/supabase-client";
 
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -86,6 +87,11 @@ export default function UploadPage() {
     try {
       const formData = new FormData();
       formData.append("resume", file);
+      const {
+  data: { user },
+} = await supabase.auth.getUser();
+
+formData.append("userId", user?.id || "");
       if (jobDescription) {
         formData.append("jobDescription", jobDescription);
       }
