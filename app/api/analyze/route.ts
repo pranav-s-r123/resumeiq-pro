@@ -1,31 +1,35 @@
 import { supabase } from "@/lib/supabase-client";
 import { NextRequest, NextResponse } from "next/server";
 
-async function callOllama(prompt: string) {
-  for (let i = 0; i < 3; i++) {
-    try {
-      const res = await fetch("http://localhost:11434/api/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "gemma3:1b",
-          prompt,
-          stream: false,
-        }),
-      });
-
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch (error) {
-      console.log("Retrying Ollama...");
-      await new Promise((r) => setTimeout(r, 1000));
+async function callGroq(prompt: string) {
+  const res = await fetch(
+    "https://api.groq.com/openai/v1/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        temperature: 0.3,
+      }),
     }
+  );
+
+  if (!res.ok) {
+    const error = await res.text();
+    console.error("Groq Error:", error);
+    throw new Error("Groq API failed");
   }
 
-  throw new Error("Ollama failed after retries");
+  return await res.json();
 }
 
 function safeParseJSON(text: string) {
@@ -132,9 +136,10 @@ ${jobDescription}
 
     await new Promise((r) => setTimeout(r, 500));
 
-    const ollamaData = await callOllama(prompt);
+    const groqData = await callGroq(prompt);
 
-    const responseText = ollamaData.response || "";
+const responseText =
+  groqData.choices?.[0]?.message?.content || "";
 
     if (!responseText) {
       throw new Error("Empty AI response");

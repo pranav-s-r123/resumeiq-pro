@@ -13,11 +13,9 @@ import {
   BarChart3,
   CheckCircle2,
   ChevronRight,
-  Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Navbar } from "@/components/shared/navbar";
 import { Footer } from "@/components/shared/footer";
 
@@ -89,30 +87,6 @@ const steps = [
   },
 ];
 
-const testimonials = [
-  {
-    name: "Priya Sharma",
-    role: "Software Engineer at TCS",
-    content:
-      "ResumeIQ Pro helped me optimize my resume and I landed my dream job at Google! The ATS score feature was incredibly helpful.",
-    avatar: "https://ui-avatars.com/api/?name=Priya+Sharma&background=4ade80&color=fff&size=100",
-  },
-  {
-    name: "Rahul Verma",
-    role: "Product Manager at Infosys",
-    content:
-      "The AI suggestions were spot-on. I revised my resume based on the feedback and got 3x more interview calls.",
-    avatar: "https://ui-avatars.com/api/?name=Rahul+Verma&background=4ade80&color=fff&size=100",
-  },
-  {
-    name: "Ananya Krishnan",
-    role: "Data Analyst at Wipro",
-    content:
-      "The skills gap analysis helped me identify exactly what I needed to learn. This tool is a game-changer!",
-    avatar: "https://ui-avatars.com/api/?name=Ananya+Krishnan&background=4ade80&color=fff&size=100",
-  },
-];
-
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-slate-900">
@@ -129,12 +103,6 @@ export default function LandingPage() {
             variants={staggerContainer}
             className="text-center"
           >
-            <motion.div variants={fadeInUp}>
-              <Badge className="mb-6 bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
-                Trusted by 500+ job seekers
-              </Badge>
-            </motion.div>
-
             <motion.h1
               variants={fadeInUp}
               className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight"
@@ -160,7 +128,7 @@ export default function LandingPage() {
                   size="lg"
                   className="gradient-emerald text-white font-semibold px-8 py-6 glow-emerald group"
                 >
-                  Get Started Free
+                  Get Started
                   <ChevronRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
@@ -272,65 +240,6 @@ export default function LandingPage() {
       </section>
 
       <section className="py-20 bg-slate-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
-              Loved by Job Seekers Everywhere
-            </h2>
-            <p className="text-slate-400 max-w-2xl mx-auto">
-              See how ResumeIQ Pro has helped thousands land their dream jobs.
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {testimonials.map((testimonial, index) => (
-              <motion.div
-                key={testimonial.name}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <Card className="glassmorphism h-full">
-                  <CardContent className="p-6">
-                    <div className="flex gap-1 mb-4">
-                      {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          className="h-5 w-5 text-emerald-500 fill-emerald-500"
-                        />
-                      ))}
-                    </div>
-                    <p className="text-slate-300 mb-6">{testimonial.content}</p>
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={testimonial.avatar}
-                        alt={testimonial.name}
-                        className="w-12 h-12 rounded-full object-cover"
-                      />
-                      <div>
-                        <p className="text-white font-medium">
-                          {testimonial.name}
-                        </p>
-                        <p className="text-slate-400 text-sm">
-                          {testimonial.role}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="py-20 bg-slate-900">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -341,8 +250,7 @@ export default function LandingPage() {
               Ready to Transform Your Resume?
             </h2>
             <p className="text-slate-400 mb-8 max-w-xl mx-auto">
-              Join thousands of job seekers who have already improved their
-              resumes with ResumeIQ Pro.
+              Improve your resume with ResumeIQ Pro and land more interviews.
             </p>
             <Link href="/upload">
               <Button
