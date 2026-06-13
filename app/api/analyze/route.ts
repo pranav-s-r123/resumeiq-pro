@@ -1,5 +1,6 @@
-import { supabase } from "@/lib/supabase-client";
 import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 
 async function callGroq(prompt: string) {
   const res = await fetch(
@@ -12,12 +13,7 @@ async function callGroq(prompt: string) {
       },
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
+        messages: [{ role: "user", content: prompt }],
         temperature: 0.3,
       }),
     }
@@ -29,7 +25,7 @@ async function callGroq(prompt: string) {
     throw new Error("Groq API failed");
   }
 
-  return await res.json();
+  return res.json();
 }
 
 function safeParseJSON(text: string) {
@@ -37,38 +33,56 @@ function safeParseJSON(text: string) {
     return JSON.parse(text);
   } catch {
     const match = text.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("Invalid AI response");
 
-    if (!match) {
-      throw new Error("Invalid AI response");
-    }
-
-    const fixed = match[0]
-      .replace(/'/g, '"')
-      .replace(/,\s*}/g, "}")
-      .replace(/,\s*]/g, "]");
-
-    return JSON.parse(fixed);
+    return JSON.parse(
+      match[0]
+        .replace(/'/g, '"')
+        .replace(/,\s*}/g, "}")
+        .replace(/,\s*]/g, "]")
+    );
   }
 }
 
 function ensureArray(arr: any, fallback: string[]) {
-  if (!Array.isArray(arr) || arr.length === 0) {
-    return fallback;
-  }
-
-  return arr;
+  return Array.isArray(arr) && arr.length > 0 ? arr : fallback;
 }
 
 export async function POST(request: NextRequest) {
   try {
+    // ---------------------------
+    // 1. Supabase Auth (FIXED)
+    // ---------------------------
+    const cookieStore = cookies();
+
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options);
+            });
+          },
+        },
+      }
+    );
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    console.log("USER:", user);
+
+    // ---------------------------
+    // 2. Form Data
+    // ---------------------------
     const formData = await request.formData();
-    const userId = formData.get("userId") as string;
-
-console.log("USER ID FROM FORM:", userId);
-
-
     const file = formData.get("resume") as File;
-    
     const jobDescription =
       (formData.get("jobDescription") as string) || "";
 
@@ -79,11 +93,12 @@ console.log("USER ID FROM FORM:", userId);
       );
     }
 
+    // ---------------------------
+    // 3. Extract text
+    // ---------------------------
     const buffer = Buffer.from(await file.arrayBuffer());
-
-    let resumeText = buffer.toString("latin1");
-
-    resumeText = resumeText
+    let resumeText = buffer
+      .toString("latin1")
       .replace(/[^\x20-\x7E\n]/g, " ")
       .replace(/\s+/g, " ")
       .trim()
@@ -91,20 +106,18 @@ console.log("USER ID FROM FORM:", userId);
 
     if (resumeText.length < 20) {
       return NextResponse.json(
-        {
-          error: "Could not extract resume text",
-        },
-        {
-          status: 400,
-        }
+        { error: "Could not extract resume text" },
+        { status: 400 }
       );
     }
 
+    // ---------------------------
+    // 4. Prompt
+    // ---------------------------
     const prompt = `
 You are an ATS Resume Analyzer.
 
-Return ONLY valid JSON.
-
+Return ONLY valid JSON:
 {
   "atsScore": number,
   "jobMatchScore": number,
@@ -117,15 +130,14 @@ Return ONLY valid JSON.
 }
 
 Rules:
-- atsScore between 50 and 95
-- jobMatchScore between 40 and 95
-- NEVER return empty arrays
-- Give minimum 5 skillsFound
-- Give minimum 3 skillsMissing
-- Give minimum 5 keywordsFound
-- Give minimum 3 keywordsMissing
-- Give minimum 3 aiSuggestions
-- Output ONLY JSON
+- atsScore: 50-95
+- jobMatchScore: 40-95
+- NEVER empty arrays
+- minimum 5 skillsFound
+- minimum 3 skillsMissing
+- minimum 5 keywordsFound
+- minimum 3 keywordsMissing
+- minimum 3 aiSuggestions
 
 Resume:
 ${resumeText}
@@ -134,135 +146,110 @@ Job Description:
 ${jobDescription}
 `;
 
-    await new Promise((r) => setTimeout(r, 500));
-
+    // ---------------------------
+    // 5. Call Groq
+    // ---------------------------
     const groqData = await callGroq(prompt);
 
-const responseText =
-  groqData.choices?.[0]?.message?.content || "";
+    const responseText =
+      groqData?.choices?.[0]?.message?.content || "";
 
-    if (!responseText) {
-      throw new Error("Empty AI response");
-    }
+    if (!responseText) throw new Error("Empty AI response");
 
     let analysisResult;
 
-try {
-  analysisResult = safeParseJSON(responseText);
-} catch (err) {
-  console.log("JSON parse failed, using fallback");
+    try {
+      analysisResult = safeParseJSON(responseText);
+    } catch {
+      analysisResult = {
+        atsScore: 65,
+        jobMatchScore: 55,
+        overallGrade: "C",
+        skillsFound: ["Java", "Communication", "Teamwork"],
+        skillsMissing: ["System Design", "Testing"],
+        keywordsFound: ["Java", "Git", "Projects"],
+        keywordsMissing: ["Cloud", "REST API"],
+        aiSuggestions: ["Improve formatting", "Add more projects"],
+      };
+    }
 
-  analysisResult = {
-    atsScore: 65,
-    jobMatchScore: 55,
-    overallGrade: "C",
-    skillsFound: ["Java", "Communication", "Teamwork"],
-    skillsMissing: ["System Design", "Testing"],
-    keywordsFound: ["Java", "Git", "Projects"],
-    keywordsMissing: ["Cloud", "REST API"],
-    aiSuggestions: ["Improve formatting", "Add more projects"],
-  };
-}
+    // ---------------------------
+    // 6. Normalize scores
+    // ---------------------------
     const atsScore = Math.max(
       40,
-      Math.min(
-        95,
-        Number(analysisResult.atsScore) || 65
-      )
+      Math.min(95, Number(analysisResult.atsScore) || 65)
     );
 
     const jobMatchScore = Math.max(
       30,
-      Math.min(
-        95,
-        Number(analysisResult.jobMatchScore) || 55
-      )
+      Math.min(95, Number(analysisResult.jobMatchScore) || 55)
     );
 
-    const overallGrade =
-  analysisResult.overallGrade || "C";
+    const overallGrade = analysisResult.overallGrade || "C";
 
-// Save analysis to Supabase
-try {
-  const { data, error } = await supabase
-  .from("resume_history")
-  .insert([
-    {
-      user_id: userId || null, 
-      file_name: file.name,
-      ats_score: atsScore,
-      job_match_score: jobMatchScore,
-      overall_grade: overallGrade,
-    },
-  ])
-  .select();
+    // ---------------------------
+    // 7. Save to Supabase
+    // ---------------------------
+    const { data, error } = await supabase
+      .from("resume_history")
+      .insert([
+        {
+          user_id: user?.id ?? null,
+          file_name: file.name,
+          ats_score: atsScore,
+          job_match_score: jobMatchScore,
+          overall_grade: overallGrade,
+        },
+      ])
+      .select();
 
-console.log("INSERT DATA:", data);
-console.log("INSERT ERROR:", error);
+    console.log("INSERT DATA:", data);
+    console.log("INSERT ERROR:", error);
 
-  if (error) {
-    console.error("Supabase Insert Error:", error);
-  }
-} catch (err) {
-  console.error("Supabase Save Failed:", err);
-}
-
-return NextResponse.json({
+    // ---------------------------
+    // 8. Response
+    // ---------------------------
+    return NextResponse.json({
       fileName: file.name,
       analyzedAt: new Date().toISOString(),
-
       atsScore,
       jobMatchScore,
       overallGrade,
 
-      skillsFound: ensureArray(
-        analysisResult.skillsFound,
-        [
-          "Communication",
-          "Problem Solving",
-          "Teamwork",
-          "Java",
-          "Projects",
-        ]
-      ),
+      skillsFound: ensureArray(analysisResult.skillsFound, [
+        "Communication",
+        "Problem Solving",
+        "Teamwork",
+        "Java",
+        "Projects",
+      ]),
 
-      skillsMissing: ensureArray(
-        analysisResult.skillsMissing,
-        [
-          "Leadership",
-          "System Design",
-          "Testing",
-        ]
-      ),
+      skillsMissing: ensureArray(analysisResult.skillsMissing, [
+        "Leadership",
+        "System Design",
+        "Testing",
+      ]),
 
-      keywordsFound: ensureArray(
-        analysisResult.keywordsFound,
-        [
-          "Java",
-          "Projects",
-          "Development",
-          "Programming",
-          "Git",
-        ]
-      ),
+      keywordsFound: ensureArray(analysisResult.keywordsFound, [
+        "Java",
+        "Projects",
+        "Development",
+        "Programming",
+        "Git",
+      ]),
 
-      keywordsMissing: ensureArray(
-        analysisResult.keywordsMissing,
-        [
-          "REST API",
-          "Microservices",
-          "Cloud",
-        ]
-      ),
+      keywordsMissing: ensureArray(analysisResult.keywordsMissing, [
+        "REST API",
+        "Microservices",
+        "Cloud",
+      ]),
 
-      aiSuggestions: ensureArray(
-        analysisResult.aiSuggestions,
-        [
-          "Add measurable project outcomes",
-          "Include more technical keywords",
-          "Improve resume formatting",
-        ]
-      ),
+      aiSuggestions: ensureArray(analysisResult.aiSuggestions, [
+        "Add measurable outcomes",
+        "Improve formatting",
+        "Add more technical keywords",
+      ]),
     });
   } catch (error) {
     console.error(error);
@@ -270,40 +257,8 @@ return NextResponse.json({
     return NextResponse.json(
       {
         error: "Failed to analyze resume",
-
-        atsScore: 50,
-        jobMatchScore: 40,
-        overallGrade: "C",
-
-        skillsFound: [
-          "Communication",
-          "Problem Solving",
-        ],
-
-        skillsMissing: [
-          "Leadership",
-          "System Design",
-        ],
-
-        keywordsFound: [
-          "Java",
-          "Projects",
-        ],
-
-        keywordsMissing: [
-          "Cloud",
-          "REST API",
-        ],
-
-        aiSuggestions: [
-          "Improve formatting",
-          "Add more technical skills",
-          "Include project achievements",
-        ],
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
