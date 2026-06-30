@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     // ---------------------------
     // 1. Supabase Auth (FIXED)
     // ---------------------------
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
 
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

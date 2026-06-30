@@ -45,42 +45,41 @@ export default function DashboardPage() {
   const [resumeHistory, setResumeHistory] = useState<ResumeHistory[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = async () => {
-    setLoading(true);
+ const fetchData = async () => {
+  setLoading(true);
 
-    // ✅ FIX 1: Use getSession instead of getUser
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+  const {
+    data: { user: currentUser },
+  } = await supabase.auth.getUser();
 
-    const currentUser = session?.user;
+  console.log("Dashboard User:", currentUser);
 
-    console.log("Session:", session);
+  if (!currentUser) {
+    router.push("/auth");
+    return;
+  }
 
-    if (!currentUser) {
-      router.push("/auth");
-      return;
-    }
+  setUser(currentUser as unknown as User);
 
-    setUser(currentUser as unknown as User);
+  const { data, error } = await supabase
+    .from("resume_history")
+    .select("*")
+    .eq("user_id", currentUser.id)
+    .order("created_at", { ascending: false });
 
-    const { data, error } = await supabase
-      .from("resume_history")
-      .select("*")
-      .eq("user_id", currentUser.id)
-      .order("created_at", { ascending: false });
+  console.log("History Data:", data);
+  console.log("History Error:", error);
 
-    if (error) {
-      console.error("History fetch error:", error);
-      toast.error("Failed to load history");
-      setLoading(false);
-      return;
-    }
-
-    setResumeHistory(data || []);
+  if (error) {
+    console.error("History fetch error:", error);
+    toast.error("Failed to load history");
     setLoading(false);
-  };
+    return;
+  }
 
+  setResumeHistory(data || []);
+  setLoading(false);
+};
   useEffect(() => {
     // small delay ensures Supabase session is ready after redirect
     const timer = setTimeout(() => {
