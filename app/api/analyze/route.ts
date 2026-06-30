@@ -76,7 +76,8 @@ export async function POST(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
 
-    console.log("USER:", user);
+   console.log("AUTH USER:", user);
+   console.log("AUTH USER ID:", user?.id);  
 
     // ---------------------------
     // 2. Form Data
