@@ -205,7 +205,7 @@ export default function DashboardPage() {
             <Link href="/upload" className="flex items-center gap-3 text-white">
               <Upload /> Upload
             </Link>
-            <Link href="/settings" className="flex items-center gap-3 text-white">
+            <Link href="/dashboard/settings" className="flex items-center gap-3 text-white">
               <Settings /> Settings
             </Link>
           </nav>
